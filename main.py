@@ -15,7 +15,7 @@ class App(QtWidgets.QMainWindow):
         uic.loadUi('ui/main.ui', self)
         self.setWindowTitle('SimpleParser')
         self.catalog = Catalog('https://orangebattery.ru/category')
-        self.refreshButton.clicked.connect(self.update_catalog)
+        self.refreshButton.clicked.connect(self.start_updating)
         self.catalogTreeWidget.itemClicked.connect(self.display_product)
 
     # Загрузка кэшированного каталога
@@ -37,24 +37,25 @@ class App(QtWidgets.QMainWindow):
         json.dump(self.catalog.data, f, indent='\n', ensure_ascii=False)
         f.close()
 
-    # Обновление каталога
-    def update_catalog(self):
+    def start_updating(self):
         self.updateLabel.setText('Обновление каталога...')
-        print('DICK')
+        self.productCounter.setText('...')
+        self.categoryCounter.setText('...')
         self.refreshButton.setDisabled(True)
         self.catalog = Catalog('https://orangebattery.ru/category')
         self.catalogTreeWidget.clear()
+        t = threading.Thread(target=self.update_catalog)
+        t.start()
+
+    # Обновление каталога
+    def update_catalog(self):
         try:
             self.catalog.parse()
-            # event = threading.Event()
-            # updating = threading.Thread(target=self.catalog.parse, args=[event])
-            # updating.start()
-            # event.wait()
             self.to_tree_level(self.catalog.data['children'], self.catalogTreeWidget, 1)
             self.updateLabel.setText('Последнее обновление: ' + time.ctime(self.catalog.data['updated']))
             self.cache()
-        except:
-            Message('Ошибка обновления')
+        except requests.exceptions.ConnectionError:
+            self.show_message('Ошибка обновления')
         self.refreshButton.setDisabled(False)
         self.productCounter.setText(str(self.catalog.data['products']))
         self.categoryCounter.setText(str(self.catalog.data['categories']))
@@ -80,18 +81,37 @@ class App(QtWidgets.QMainWindow):
         self.productName.setText(item.text(0))
         self.productPrice.setText('Цена: ' + product['price'] + ' р.')
 
+    @staticmethod
+    def disable(*args):
+        for element in args:
+            element.setDisabled(True)
 
-class Message(QtWidgets.QMessageBox):
-    def __init__(self, msg):
+    @staticmethod
+    def enable(*args):
+        for element in args:
+            element.setDisabled(False)
+
+    @staticmethod
+    def show_message(msg):
         print('Message: ' + msg)
-        super().__init__()
-        self.setText(msg)
-        self.show()
+        mb = QtWidgets.QMessageBox()
+        mb.setText(msg)
+        mb.exec()
+
+    @staticmethod
+    def show_error(msg):
+        print('Message: ' + msg)
+        mb = QtWidgets.QErrorMessage()
+        mb.setText(msg)
+        mb.exec()
 
 
 class Catalog:
     def __init__(self, url: str):
-        self.data = {'name:': 'root', 'url': url, 'products': 0, 'categories': 0}
+        self.data = {'name:': 'root',
+                     'url': url,
+                     'products': 0,
+                     'categories': 0}
         self.url = url
 
     # Рекурсивный парсинг дочерних элементов
