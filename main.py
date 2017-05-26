@@ -79,6 +79,9 @@ class App(QtWidgets.QMainWindow):
             self.show_message('Ошибка',
                               'Ошибка получения данных. Обновите каталог или проверье подключение к интернету!')
             return
+        except AttributeError:
+            self.catalogTreeWidget.expandItem(item)
+            return
         thumbnail_img = QImage.fromData(product['thumb'])
         thumbnail_pixmap = QPixmap.fromImage(thumbnail_img)
         self.productDisplay.setHtml(product['description'])
