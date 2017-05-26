@@ -55,7 +55,7 @@ class App(QtWidgets.QMainWindow):
             self.updateLabel.setText('Последнее обновление: ' + time.ctime(self.catalog.data['updated']))
             self.cache()
         except requests.exceptions.ConnectionError:
-            self.show_message('Ошибка обновления')
+            self.show_message('Ошибка', 'Ошибка обновления')
         self.refreshButton.setDisabled(False)
         self.productCounter.setText(str(self.catalog.data['products']))
         self.categoryCounter.setText(str(self.catalog.data['categories']))
@@ -73,7 +73,12 @@ class App(QtWidgets.QMainWindow):
 
     # Отображение сведений о продукте
     def display_product(self, item):
-        product = (self.catalog.get_product(item))
+        try:
+            product = (self.catalog.get_product(item))
+        except requests.exceptions.ConnectionError:
+            self.show_message('Ошибка',
+                              'Ошибка получения данных. Обновите каталог или проверье подключение к интернету!')
+            return
         thumbnail_img = QImage.fromData(product['thumb'])
         thumbnail_pixmap = QPixmap.fromImage(thumbnail_img)
         self.productDisplay.setHtml(product['description'])
@@ -92,16 +97,18 @@ class App(QtWidgets.QMainWindow):
             element.setDisabled(False)
 
     @staticmethod
-    def show_message(msg):
+    def show_message(title, msg):
         print('Message: ' + msg)
         mb = QtWidgets.QMessageBox()
+        mb.setWindowTitle(title)
         mb.setText(msg)
         mb.exec()
 
     @staticmethod
-    def show_error(msg):
+    def show_error(title, msg):
         print('Message: ' + msg)
         mb = QtWidgets.QErrorMessage()
+        mb.setWindowTitle(title)
         mb.setText(msg)
         mb.exec()
 
