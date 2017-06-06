@@ -21,9 +21,7 @@ class App(QtWidgets.QMainWindow):
     # Загрузка кэшированного каталога
     def load(self):
         try:
-            f = open('catalog.cache')
-            self.catalog.data = json.load(f)
-            f.close()
+            self.catalog.load('catalog.cache')
             self.updateLabel.setText('Последнее обновление: ' + time.ctime(self.catalog.data['updated']))
             self.productCounter.setText(str(self.catalog.data['products']))
             self.categoryCounter.setText(str(self.catalog.data['categories']))
@@ -33,9 +31,10 @@ class App(QtWidgets.QMainWindow):
 
     # Сохранение каталога в кэш
     def cache(self):
-        f = open('catalog.cache', 'w')
-        json.dump(self.catalog.data, f, indent='\n', ensure_ascii=False)
-        f.close()
+        try:
+            self.catalog.cache('catalog.cache')
+        except:
+            App.show_message('Ошибка', 'Ошибка кэширования каталога')
 
     def start_updating(self):
         self.updateLabel.setText('Обновление каталога...')
@@ -74,7 +73,7 @@ class App(QtWidgets.QMainWindow):
     # Отображение сведений о продукте
     def display_product(self, item):
         try:
-            product = (self.catalog.get_product(item))
+            product = (self.catalog.get_product(item.url))
         except requests.exceptions.ConnectionError:
             self.show_message('Ошибка',
                               'Ошибка получения данных. Обновите каталог или проверье подключение к интернету!')
@@ -117,7 +116,7 @@ class App(QtWidgets.QMainWindow):
 
 
 class Catalog:
-    def __init__(self, url: str):
+    def __init__(self, url):
         self.data = {'name:': 'root',
                      'url': url,
                      'products': 0,
@@ -142,7 +141,6 @@ class Catalog:
                     a = j.find(class_='caption').a
                     child = {'url': a['href'], 'name': a.text, 'description': j.text}
                     children.append(child)
-                    print('New product found: ' + child['name'])
                     self.data['products'] += 1
                 i['children'] = children
 
@@ -151,12 +149,12 @@ class Catalog:
         self.__parse_children([self.data])
         self.data['updated'] = time.time()
 
-    def get_product(self, item):
-        response = requests.get(item.url, verify=False)
+    def get_product(self, url):
+        response = requests.get(url, verify=False)
         soup = BeautifulSoup(response.text, 'lxml').find(id='content')
         description = str(soup.find(id='tab-description')) + str(soup.find(id='tab-specification'))
         price = soup.find(class_='rubel').text
-        name = ''
+        name = soup.find(class_='product-head').text
         thumb_url = soup.find(class_='thumbnail')['href']
         thumbnail = requests.get(thumb_url, verify=False)
         product = {
@@ -167,6 +165,22 @@ class Catalog:
                    }
         return product
 
+    def load(self, filename):
+        try:
+            f = open(filename)
+            self.data = json.load(f)
+            f.close()
+        except FileNotFoundError:
+            raise
+
+    def cache(self, filename):
+        try:
+            f = open(filename, 'w')
+            json.dump(self.data, f, indent='\n', ensure_ascii=False)
+            f.close()
+        except:
+            raise
+
 
 def main():
     myApp = QtWidgets.QApplication(sys.argv)
@@ -175,4 +189,4 @@ def main():
     app.load()
     sys.exit(myApp.exec_())
 
-main()
+# main()
